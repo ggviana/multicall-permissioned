@@ -45,7 +45,7 @@ interface IMulticall3 {
 
     function getCurrentBlockCoinbase() external view returns (address coinbase);
 
-    function getCurrentBlockDifficulty() external view returns (uint256 difficulty);
+    function getCurrentBlockPrevrandao() external view returns (uint256 prevrandao);
 
     function getCurrentBlockGasLimit() external view returns (uint256 gaslimit);
 

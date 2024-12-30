@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.12;
+pragma solidity 0.8.20;
 
-/// @title Multicall3
-/// @notice Aggregate results from multiple function calls
+import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+
+/// @title Multicall3Permissioned
+/// @notice A permissioned contract for aggregating results from multiple function calls.
+/// Access to aggregation methods is restricted to the contract owner using the Ownable module.
 /// @dev Multicall & Multicall2 backwards-compatible
 /// @dev Aggregate methods are marked `payable` to save 24 gas per call
 /// @author Michael Elliot <mike@makerdao.com>
@@ -10,7 +13,8 @@ pragma solidity 0.8.12;
 /// @author Nick Johnson <arachnid@notdot.net>
 /// @author Andreas Bigger <andreas@nascent.xyz>
 /// @author Matt Solomon <matt@mattsolomon.dev>
-contract Multicall3 {
+/// @author Guilherme Guimarães <gui@pods.finance>
+contract Multicall3Permissioned is Ownable {
     struct Call {
         address target;
         bytes callData;
@@ -34,11 +38,13 @@ contract Multicall3 {
         bytes returnData;
     }
 
+    constructor() Ownable(msg.sender) {}
+
     /// @notice Backwards-compatible call aggregation with Multicall
     /// @param calls An array of Call structs
     /// @return blockNumber The block number where the calls were executed
     /// @return returnData An array of bytes containing the responses
-    function aggregate(Call[] calldata calls) public payable returns (uint256 blockNumber, bytes[] memory returnData) {
+    function aggregate(Call[] calldata calls) public payable onlyOwner returns (uint256 blockNumber, bytes[] memory returnData) {
         blockNumber = block.number;
         uint256 length = calls.length;
         returnData = new bytes[](length);
@@ -57,7 +63,7 @@ contract Multicall3 {
     /// @param requireSuccess If true, require all calls to succeed
     /// @param calls An array of Call structs
     /// @return returnData An array of Result structs
-    function tryAggregate(bool requireSuccess, Call[] calldata calls) public payable returns (Result[] memory returnData) {
+    function tryAggregate(bool requireSuccess, Call[] calldata calls) public payable onlyOwner returns (Result[] memory returnData) {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call calldata call;
@@ -76,7 +82,7 @@ contract Multicall3 {
     /// @return blockNumber The block number where the calls were executed
     /// @return blockHash The hash of the block where the calls were executed
     /// @return returnData An array of Result structs
-    function tryBlockAndAggregate(bool requireSuccess, Call[] calldata calls) public payable returns (uint256 blockNumber, bytes32 blockHash, Result[] memory returnData) {
+    function tryBlockAndAggregate(bool requireSuccess, Call[] calldata calls) public payable onlyOwner returns (uint256 blockNumber, bytes32 blockHash, Result[] memory returnData) {
         blockNumber = block.number;
         blockHash = blockhash(block.number);
         returnData = tryAggregate(requireSuccess, calls);
@@ -88,14 +94,14 @@ contract Multicall3 {
     /// @return blockNumber The block number where the calls were executed
     /// @return blockHash The hash of the block where the calls were executed
     /// @return returnData An array of Result structs
-    function blockAndAggregate(Call[] calldata calls) public payable returns (uint256 blockNumber, bytes32 blockHash, Result[] memory returnData) {
+    function blockAndAggregate(Call[] calldata calls) public payable onlyOwner returns (uint256 blockNumber, bytes32 blockHash, Result[] memory returnData) {
         (blockNumber, blockHash, returnData) = tryBlockAndAggregate(true, calls);
     }
 
     /// @notice Aggregate calls, ensuring each returns success if required
     /// @param calls An array of Call3 structs
     /// @return returnData An array of Result structs
-    function aggregate3(Call3[] calldata calls) public payable returns (Result[] memory returnData) {
+    function aggregate3(Call3[] calldata calls) public payable onlyOwner returns (Result[] memory returnData) {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call3 calldata calli;
@@ -126,7 +132,7 @@ contract Multicall3 {
     /// @notice Reverts if msg.value is less than the sum of the call values
     /// @param calls An array of Call3Value structs
     /// @return returnData An array of Result structs
-    function aggregate3Value(Call3Value[] calldata calls) public payable returns (Result[] memory returnData) {
+    function aggregate3Value(Call3Value[] calldata calls) public payable onlyOwner returns (Result[] memory returnData) {
         uint256 valAccumulator;
         uint256 length = calls.length;
         returnData = new Result[](length);
@@ -176,9 +182,9 @@ contract Multicall3 {
         coinbase = block.coinbase;
     }
 
-    /// @notice Returns the block difficulty
-    function getCurrentBlockDifficulty() public view returns (uint256 difficulty) {
-        difficulty = block.difficulty;
+    /// @notice Returns the block prevrandao
+    function getCurrentBlockPrevrandao() public view returns (uint256 prevrandao) {
+        prevrandao = block.prevrandao;
     }
 
     /// @notice Returns the block gas limit
