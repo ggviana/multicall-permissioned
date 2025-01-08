@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Whitelist} from "./Whitelist.sol";
 
 /// @title Multicall3Permissioned
 /// @notice A permissioned contract for aggregating results from multiple function calls.
@@ -14,7 +15,7 @@ import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.so
 /// @author Andreas Bigger <andreas@nascent.xyz>
 /// @author Matt Solomon <matt@mattsolomon.dev>
 /// @author Guilherme Guimarães <gui@pods.finance>
-contract Multicall3Permissioned is Ownable {
+contract Multicall3Permissioned is Ownable, Whitelist {
     struct Call {
         address target;
         bytes callData;
@@ -40,6 +41,20 @@ contract Multicall3Permissioned is Ownable {
 
     constructor() Ownable(msg.sender) {}
 
+    /// @notice Adds an address to the whitelist.
+    /// @dev Emits a `WhitelistAddressAdded` event on success.
+    /// @param target The address to be added to the whitelist.
+    function addWhitelistAddress(address target) public override onlyOwner {
+        super.addWhitelistAddress(target);
+    }
+
+    /// @notice Removes an address from the whitelist.
+    /// @dev Emits a `WhitelistAddressRemoved` event on success.
+    /// @param target The address to be removed from the whitelist.
+    function removeWhitelistAddress(address target) public override onlyOwner {
+        super.removeWhitelistAddress(target);
+    }
+
     /// @notice Backwards-compatible call aggregation with Multicall
     /// @param calls An array of Call structs
     /// @return blockNumber The block number where the calls were executed
@@ -49,9 +64,11 @@ contract Multicall3Permissioned is Ownable {
         uint256 length = calls.length;
         returnData = new bytes[](length);
         Call calldata call;
+        bool whitelist = hasWhitelist();
         for (uint256 i = 0; i < length;) {
             bool success;
             call = calls[i];
+            if (whitelist && !isAllowed(call.target)) revert WhitelistNotAllowed(call.target);
             (success, returnData[i]) = call.target.call(call.callData);
             require(success, "Multicall3: call failed");
             unchecked { ++i; }
@@ -67,9 +84,11 @@ contract Multicall3Permissioned is Ownable {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call calldata call;
+        bool whitelist = hasWhitelist();
         for (uint256 i = 0; i < length;) {
             Result memory result = returnData[i];
             call = calls[i];
+            if (whitelist && !isAllowed(call.target)) revert WhitelistNotAllowed(call.target);
             (result.success, result.returnData) = call.target.call(call.callData);
             if (requireSuccess) require(result.success, "Multicall3: call failed");
             unchecked { ++i; }
@@ -105,9 +124,11 @@ contract Multicall3Permissioned is Ownable {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call3 calldata calli;
+        bool whitelist = hasWhitelist();
         for (uint256 i = 0; i < length;) {
             Result memory result = returnData[i];
             calli = calls[i];
+            if (whitelist && !isAllowed(calli.target)) revert WhitelistNotAllowed(calli.target);
             (result.success, result.returnData) = calli.target.call(calli.callData);
             assembly {
                 // Revert if the call fails and failure is not allowed
@@ -137,9 +158,11 @@ contract Multicall3Permissioned is Ownable {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call3Value calldata calli;
+        bool whitelist = hasWhitelist();
         for (uint256 i = 0; i < length;) {
             Result memory result = returnData[i];
             calli = calls[i];
+            if (whitelist && !isAllowed(calli.target)) revert WhitelistNotAllowed(calli.target);
             uint256 val = calli.value;
             // Humanity will be a Type V Kardashev Civilization before this overflows - andreas
             // ~ 10^25 Wei in existence << ~ 10^76 size uint fits in a uint256

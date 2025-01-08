@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Multicall3Permissioned} from "../Multicall3Permissioned.sol";
+import {Whitelist} from "../Whitelist.sol";
 import {Ownable} from "../../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {MockCallee} from "./mocks/MockCallee.sol";
 import {EtherSink} from "./mocks/EtherSink.sol";
@@ -216,6 +217,43 @@ contract Multicall3PermissionedTest is Test {
     // Test calling from authorized address
     vm.prank(authorized);
     multicall.aggregate3Value{value: 1}(calls3);
+  }
+
+  function testWhitelistManagement() public {
+    MockCallee whitelistedCallee = new MockCallee();
+    // Should fail if called from an unauthorized callee
+    assertFalse(multicall.hasWhitelist());
+
+    _expectUnauthorizedRevert();
+    multicall.addWhitelistAddress(address(whitelistedCallee));
+
+    _expectUnauthorizedRevert();
+    multicall.removeWhitelistAddress(address(whitelistedCallee));
+
+    // Should add to whitelist if called from an authorized callee
+    vm.startPrank(authorized);
+    multicall.addWhitelistAddress(address(whitelistedCallee));
+    assertTrue(multicall.hasWhitelist());
+    assertTrue(multicall.isAllowed(address(whitelistedCallee)), "Address should be whitelisted");
+
+    // Should check the contract is not whitelisted
+    Multicall3Permissioned.Call3Value[] memory calls = new Multicall3Permissioned.Call3Value[](2);
+    calls[0] = Multicall3Permissioned.Call3Value(address(whitelistedCallee), true, 1, abi.encodeWithSignature("sendBackValue(address)", address(etherSink)));
+    calls[1] = Multicall3Permissioned.Call3Value(address(callee), true, 1, abi.encodeWithSignature("sendBackValue(address)", address(etherSink)));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        Whitelist.WhitelistNotAllowed.selector,
+        address(callee)
+      )
+    );
+    multicall.aggregate3Value(calls);
+
+    // Should remove from whitelist if called from an authorized callee
+    multicall.removeWhitelistAddress(address(whitelistedCallee));
+    assertFalse(multicall.hasWhitelist());
+    assertFalse(multicall.isAllowed(address(whitelistedCallee)), "Address should be whitelisted");
+
+    vm.stopPrank();
   }
 
   /// >>>>>>>>>>>>>>>>>>>>>>  HELPER TESTS  <<<<<<<<<<<<<<<<<<<<<<< ///
