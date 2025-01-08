@@ -39,7 +39,7 @@ contract Multicall3Permissioned is Ownable, Whitelist {
         bytes returnData;
     }
 
-    constructor() Ownable(msg.sender) {}
+    constructor(address owner) Ownable(owner) {}
 
     /// @notice Adds an address to the whitelist.
     /// @dev Emits a `WhitelistAddressAdded` event on success.

@@ -23,7 +23,7 @@ contract Multicall3PermissionedTest is Test {
     vm.deal(unauthorized, 10 ether);
 
     vm.prank(authorized);
-    multicall = new Multicall3Permissioned();
+    multicall = new Multicall3Permissioned(authorized);
     callee = new MockCallee();
     etherSink = new EtherSink();
   }
@@ -190,13 +190,14 @@ contract Multicall3PermissionedTest is Test {
   }
 
   function testAggregate3ValueUnsuccessful() public {
+    // Test calling from authorized address
+    vm.startPrank(authorized);
+
     Multicall3Permissioned.Call3Value[] memory calls = new Multicall3Permissioned.Call3Value[](3);
     calls[0] = Multicall3Permissioned.Call3Value(address(callee), false, 0, abi.encodeWithSignature("getBlockHash(uint256)", block.number));
     calls[1] = Multicall3Permissioned.Call3Value(address(callee), false, 0, abi.encodeWithSignature("thisMethodReverts()"));
     calls[2] = Multicall3Permissioned.Call3Value(address(callee), false, 1, abi.encodeWithSignature("sendBackValue(address)", address(etherSink)));
     vm.expectRevert(bytes("Multicall3: call failed"));
-    // Test calling from authorized address
-    vm.prank(authorized);
     multicall.aggregate3Value(calls);
 
     // Should fail if we don't provide enough value
@@ -205,8 +206,6 @@ contract Multicall3PermissionedTest is Test {
     calls2[1] = Multicall3Permissioned.Call3Value(address(callee), true, 0, abi.encodeWithSignature("thisMethodReverts()"));
     calls2[2] = Multicall3Permissioned.Call3Value(address(callee), true, 1, abi.encodeWithSignature("sendBackValue(address)", address(etherSink)));
     vm.expectRevert(bytes("Multicall3: value mismatch"));
-    // Test calling from authorized address
-    vm.prank(authorized);
     multicall.aggregate3Value(calls2);
 
     // Works if we provide enough value
@@ -214,9 +213,9 @@ contract Multicall3PermissionedTest is Test {
     calls3[0] = Multicall3Permissioned.Call3Value(address(callee), false, 0, abi.encodeWithSignature("getBlockHash(uint256)", block.number));
     calls3[1] = Multicall3Permissioned.Call3Value(address(callee), true, 0, abi.encodeWithSignature("thisMethodReverts()"));
     calls3[2] = Multicall3Permissioned.Call3Value(address(callee), false, 1, abi.encodeWithSignature("sendBackValue(address)", address(etherSink)));
-    // Test calling from authorized address
-    vm.prank(authorized);
     multicall.aggregate3Value{value: 1}(calls3);
+
+    vm.stopPrank();
   }
 
   function testWhitelistManagement() public {
